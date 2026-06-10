@@ -130,6 +130,12 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
             if (zombies.isEmpty()) {
                 wave++;
                 zombiesSpawnedThisWave = 0;
+                // Every 3 waves, increase all zombies' base HP by 80
+                if (wave % 3 == 0) {
+                    Zombie.addGlobalHpBonus(80);
+                    addFloatText("All zombies +80 HP!", Constants.WINDOW_WIDTH / 2, 170,
+                            new Color(255, 140, 0), 20, 1800);
+                }
                 if (wave <= maxWaves) {
                     addFloatText("第 " + wave + " 波！", Constants.WINDOW_WIDTH / 2, 200,
                             new Color(255, 80, 80), 30, 2500);
@@ -150,7 +156,16 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
             } else if (wave <= 4) {
                 zType = r < 0.75 ? Zombie.TEMPLATE_NORMAL : Zombie.TEMPLATE_FAST;
             } else {
-                zType = r < 0.55 ? Zombie.TEMPLATE_NORMAL : r < 0.85 ? Zombie.TEMPLATE_FAST : Zombie.TEMPLATE_TANK;
+                // wave >= 5: 15% Cherry, 55% Normal, 25% Fast, 5% Tank
+                if (r < 0.15) {
+                    zType = Zombie.TEMPLATE_CHERRY;
+                } else if (r < 0.70) {
+                    zType = Zombie.TEMPLATE_NORMAL;
+                } else if (r < 0.95) {
+                    zType = Zombie.TEMPLATE_FAST;
+                } else {
+                    zType = Zombie.TEMPLATE_TANK;
+                }
             }
             int maxLevel = Math.min(4, 1 + wave / 2);
             int level = 1 + (int)(Math.random() * maxLevel);
@@ -159,6 +174,8 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
                 z = new FastZombie(row, level);
             } else if (zType == Zombie.TEMPLATE_TANK) {
                 z = new TankZombie(row, level);
+            } else if (zType == Zombie.TEMPLATE_CHERRY) {
+                z = new CherryZombie(row, level);
             } else {
                 z = new NormalZombie(row, level);
             }
@@ -268,7 +285,13 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
             double dist = Math.hypot(zx - cx, zy - cy);
             if (dist <= Constants.CHERRY_RADIUS) {
                 z.hp -= Constants.CHERRY_DMG;
-                if (z.isDead()) { it.remove(); zombiesKilled++; sunCount += 5; }
+                if (z.isDead()) {
+                    // handle special death effects (e.g., cherry zombie explosion)
+                    handleZombieDeathEffects(z);
+                    it.remove();
+                    zombiesKilled++;
+                    sunCount += 5;
+                }
             }
         }
     }
@@ -303,6 +326,8 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
                         sunCount += 5;
                         addFloatText("+5 ☀", (int)z.x + 20, z.getPixelY() - 10,
                                 new Color(255, 220, 0), 16, 800);
+                        // trigger death effects (like cherry zombie explosion)
+                        handleZombieDeathEffects(z);
                     }
                     hit = true;
                     break;
@@ -310,6 +335,34 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
             }
             if (hit) { pi.remove(); }
             zombies.removeIf(Zombie::isDead);
+        }
+
+    }
+
+    private void handleZombieDeathEffects(Zombie z) {
+        if (z instanceof CherryZombie) {
+            int zx = (int)z.x + Zombie.ZOMBIE_W / 2;
+            int zy = z.getPixelY() + Zombie.ZOMBIE_H / 2;
+            // Explosion visual
+            explosions.add(new Explosion(zx, zy, Constants.CHERRY_ZOMBIE_RADIUS));
+            addFloatText("💥 BOOM!", zx, zy - 30, new Color(255, 120, 0), 28, 1200);
+
+            // Damage nearby plants
+            for (int r = 0; r < Constants.ROWS; r++) {
+                for (int c = 0; c < Constants.COLS; c++) {
+                    Plant p = grid[r][c];
+                    if (p == null) continue;
+                    double pdx = p.cx() - zx;
+                    double pdy = p.cy() - zy;
+                    double dist = Math.hypot(pdx, pdy);
+                    if (dist <= Constants.CHERRY_ZOMBIE_RADIUS) {
+                        p.hp -= Constants.CHERRY_ZOMBIE_DMG;
+                        if (p.isDead()) {
+                            grid[r][c] = null;
+                        }
+                    }
+                }
+            }
         }
     }
 

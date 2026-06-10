@@ -7,6 +7,12 @@ public abstract class Zombie {
     public static final int TEMPLATE_NORMAL = 0;
     public static final int TEMPLATE_FAST   = 1;
     public static final int TEMPLATE_TANK   = 2;
+    public static final int TEMPLATE_CHERRY = 3;
+    // Global HP bonus applied every 3 waves
+    private static int globalHpBonus = 0;
+
+    public static void addGlobalHpBonus(int amount) { globalHpBonus += amount; }
+    public static int getGlobalHpBonus() { return globalHpBonus; }
 
     public int row;
     public double x;          // pixel X
@@ -44,7 +50,8 @@ public abstract class Zombie {
     }
 
     private static int calculateHp(int baseHp, int level) {
-        return (int) (baseHp * (1 + (level - 1) * Constants.ZOMBIE_LEVEL_HP_MULT));
+        int effectiveBase = baseHp + globalHpBonus;
+        return (int) (effectiveBase * (1 + (level - 1) * Constants.ZOMBIE_LEVEL_HP_MULT));
     }
 
     public boolean isDead() { return hp <= 0; }
@@ -147,25 +154,45 @@ public abstract class Zombie {
             g.fillRoundRect(px + 38, py + 30, armW, 18 - armSwing, 5, 5);
         }
 
-        // Head
-        g.setColor(skinColor);
-        g.fillOval(px + 10, py + 2, 30, 28);
-        g.setColor(skinColor.darker());
-        g.drawOval(px + 10, py + 2, 30, 28);
-
-        // Hair / helmet variants
-        if (templateId == TEMPLATE_TANK) {
-            // Helmet
-            g.setColor(new Color(50, 50, 60));
-            g.fillArc(px + 8, py - 2, 34, 18, 0, 180);
-            g.setColor(new Color(40, 40, 50));
-            g.drawArc(px + 8, py - 2, 34, 18, 0, 180);
+        // Head (cherry variant replaces normal head)
+        if (templateId == TEMPLATE_CHERRY) {
+            // Cherry head: two cherries with stems
+            int leftX = px + 10;
+            int topY  = py - 6;
+            g.setColor(new Color(200, 30, 30));
+            g.fillOval(leftX, topY, 20, 20);
+            g.fillOval(leftX + 16, topY, 20, 20);
+            // Highlights
+            g.setColor(new Color(255, 200, 200, 160));
+            g.fillOval(leftX + 4, topY + 4, 6, 6);
+            g.fillOval(leftX + 20, topY + 4, 6, 6);
+            // Stems
+            g.setColor(new Color(60, 120, 40));
+            g.setStroke(new BasicStroke(2));
+            g.drawLine(leftX + 10, topY + 4, leftX + 8, topY - 12);
+            g.drawLine(leftX + 30, topY + 4, leftX + 34, topY - 12);
+            g.setStroke(new BasicStroke(1));
         } else {
-            // Hair (messy)
-            g.setColor(new Color(60, 40, 20));
-            g.fillRect(px + 12, py + 2, 26, 8);
-            g.fillOval(px + 8,  py,     12, 10);
-            g.fillOval(px + 30, py,     14, 8);
+            // Normal head
+            g.setColor(skinColor);
+            g.fillOval(px + 10, py + 2, 30, 28);
+            g.setColor(skinColor.darker());
+            g.drawOval(px + 10, py + 2, 30, 28);
+
+            // Hair / helmet variants
+            if (templateId == TEMPLATE_TANK) {
+                // Helmet
+                g.setColor(new Color(50, 50, 60));
+                g.fillArc(px + 8, py - 2, 34, 18, 0, 180);
+                g.setColor(new Color(40, 40, 50));
+                g.drawArc(px + 8, py - 2, 34, 18, 0, 180);
+            } else {
+                // Hair (messy)
+                g.setColor(new Color(60, 40, 20));
+                g.fillRect(px + 12, py + 2, 26, 8);
+                g.fillOval(px + 8,  py,     12, 10);
+                g.fillOval(px + 30, py,     14, 8);
+            }
         }
 
         // Eyes (zombie: lopsided) and face details per template

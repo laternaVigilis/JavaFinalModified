@@ -59,6 +59,10 @@ public class Constants {
     public static final int CHERRY_RADIUS       = 120;
     public static final int CHERRY_FUSE         = 2000;  // ms
 
+    // Cherry zombie explosion
+    public static final int CHERRY_ZOMBIE_RADIUS = 120;
+    public static final int CHERRY_ZOMBIE_DMG    = 1800;
+
     // Sunflower sun production
     public static final int SF_SUN_INTERVAL     = 8000;  // ms
     public static final int SF_SUN_VALUE        = 25;
