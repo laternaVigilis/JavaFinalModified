@@ -59,6 +59,10 @@ public class Constants {
     public static final int CHERRY_RADIUS       = 120;
     public static final int CHERRY_FUSE         = 2000;  // ms
 
+    // Cherry zombie explosion
+    public static final int CHERRY_ZOMBIE_RADIUS = 120;
+    public static final int CHERRY_ZOMBIE_DMG    = 1800;
+
     // Sunflower sun production
     public static final int SF_SUN_INTERVAL     = 8000;  // ms
     public static final int SF_SUN_VALUE        = 25;
@@ -68,4 +72,15 @@ public class Constants {
     public static final int SHOP_ITEM_W         = 70;
     public static final int SHOP_ITEM_H         = 90;
     public static final int SHOP_START_X        = 130;
+
+    // End-screen buttons
+    public static final int END_BTN_HALF_WIDTH  = 110; // half of button width
+    public static final int END_BTN_W           = 220;
+    public static final int END_BTN_H           = 55;
+    public static final int END_BTN_RESTART_Y   = 360;
+    public static final int END_BTN_MENU_Y      = 430;
+
+    // Pause-menu button layout
+    public static final int PAUSE_BTN_FIRST_Y   = 300;
+    public static final int PAUSE_BTN_GAP       = 70;
 }
