@@ -39,6 +39,13 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
     // ── Input ──────────────────────────────────────────────────────────────────
     private PlantType selectedPlant = null;
     private int       hoverCol = -1, hoverRow = -1;
+    // Selected deployed tile (for showing remove button)
+    private int       selectedTileCol = -1, selectedTileRow = -1;
+    // Bounds for the remove (X) button
+    private Rectangle removeBtnBounds = null;
+    // Bounds for end-screen buttons (restart / main menu)
+    private Rectangle endBtnRestartBounds = null;
+    private Rectangle endBtnMenuBounds = null;
     private Point     mousePos = new Point();
 
     // ── Timer ──────────────────────────────────────────────────────────────────
@@ -82,6 +89,9 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         gameStartTime  = System.currentTimeMillis();
         totalPauseTime = 0;
         selectedPlant  = null;
+        // clear end-screen button bounds
+        endBtnRestartBounds = null;
+        endBtnMenuBounds = null;
         state          = State.PLAYING;
         timer.start();
     }
@@ -469,6 +479,8 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         drawSky(g);
         drawGrassLawn(g);
         drawGrid(g);
+        // Selected-tile highlight (under plants) — shown when clicked and mouse still over tile
+        drawSelectedHighlight(g);
         drawShop(g);
         drawHUD(g);
 
@@ -476,6 +488,9 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         for (int r = 0; r < Constants.ROWS; r++)
             for (int c = 0; c < Constants.COLS; c++)
                 if (grid[r][c] != null) grid[r][c].draw(g);
+
+        // Remove-button overlay for selected deployed tile
+        drawRemoveButton(g);
 
         // Peas
         for (Pea p : peas) p.draw(g);
@@ -700,6 +715,47 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
     }
 
+    private void drawRemoveButton(Graphics2D g) {
+        if (selectedTileCol < 0 || selectedTileRow < 0) {
+            removeBtnBounds = null;
+            return;
+        }
+        // If tile no longer has a plant, hide
+        if (grid[selectedTileRow][selectedTileCol] == null) {
+            selectedTileCol = selectedTileRow = -1;
+            removeBtnBounds = null;
+            return;
+        }
+        int tx = Constants.GRID_X + selectedTileCol * Constants.CELL_W;
+        int ty = Constants.GRID_Y + selectedTileRow * Constants.CELL_H;
+        int bw = 20, bh = 20;
+        int bx = tx + Constants.CELL_W - bw - 6;
+        int by = ty + 6;
+        // Button background
+        g.setColor(new Color(200, 50, 50, 220));
+        g.fillRoundRect(bx, by, bw, bh, 6, 6);
+        g.setColor(Color.WHITE);
+        g.setStroke(new BasicStroke(2));
+        // Draw X
+        g.drawLine(bx + 4, by + 4, bx + bw - 5, by + bh - 5);
+        g.drawLine(bx + bw - 5, by + 4, bx + 4, by + bh - 5);
+        g.setStroke(new BasicStroke(1));
+        removeBtnBounds = new Rectangle(bx, by, bw, bh);
+    }
+
+    private void drawSelectedHighlight(Graphics2D g) {
+        if (selectedTileCol < 0 || selectedTileRow < 0) return;
+        // Only draw highlight while the mouse remains over the same tile
+        if (hoverCol != selectedTileCol || hoverRow != selectedTileRow) return;
+        int tx = Constants.GRID_X + selectedTileCol * Constants.CELL_W;
+        int ty = Constants.GRID_Y + selectedTileRow * Constants.CELL_H;
+        Composite old = g.getComposite();
+        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.25f));
+        g.setColor(new Color(255, 255, 255));
+        g.fillRect(tx, ty, Constants.CELL_W, Constants.CELL_H);
+        g.setComposite(old);
+    }
+
     private void drawDangerZone(Graphics2D g) {
         // Red line on left side
         g.setColor(new Color(220, 30, 30, 120));
@@ -747,8 +803,10 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
 
         drawButton(g, Constants.WINDOW_WIDTH / 2 - 110, 360, 220, 55,
                 new Color(60, 160, 60), new Color(40, 120, 40), "再玩一次", Color.WHITE, 22);
+        endBtnRestartBounds = new Rectangle(Constants.WINDOW_WIDTH / 2 - 110, 360, 220, 55);
         drawButton(g, Constants.WINDOW_WIDTH / 2 - 110, 430, 220, 55,
                 new Color(100, 60, 160), new Color(70, 40, 120), "返回主選單", Color.WHITE, 22);
+        endBtnMenuBounds = new Rectangle(Constants.WINDOW_WIDTH / 2 - 110, 430, 220, 55);
     }
 
     private void drawButton(Graphics2D g, int x, int y, int w, int h,
@@ -766,7 +824,32 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
     }
 
     // ── Mouse events ───────────────────────────────────────────────────────────
-    @Override public void mouseClicked(MouseEvent e) {}
+    @Override
+    public void mouseClicked(MouseEvent e) {
+        int mx = e.getX(), my = e.getY();
+        // Menu start
+        if (state == State.MENU) {
+            if (mx >= Constants.WINDOW_WIDTH / 2 - 100 && mx <= Constants.WINDOW_WIDTH / 2 + 100
+                    && my >= 250 && my <= 305) {
+                startGame();
+            }
+            return;
+        }
+
+        // End screen buttons (use drawn bounds for accuracy)
+        if (state == State.WIN || state == State.LOSE) {
+            if (endBtnRestartBounds != null && endBtnRestartBounds.contains(mx, my)) {
+                startGame();
+            } else if (endBtnMenuBounds != null && endBtnMenuBounds.contains(mx, my)) {
+                state = State.MENU;
+                timer.stop();
+                // clear button bounds when returning to menu
+                endBtnRestartBounds = null;
+                endBtnMenuBounds = null;
+            }
+            return;
+        }
+    }
     @Override public void mouseEntered(MouseEvent e) {}
     @Override public void mouseExited(MouseEvent e) {}
     @Override public void mouseDragged(MouseEvent e) {}
@@ -775,10 +858,23 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
     public void mouseMoved(MouseEvent e) {
         mousePos = e.getPoint();
         int mx = e.getX(), my = e.getY();
-        hoverCol = (mx - Constants.GRID_X) / Constants.CELL_W;
-        hoverRow = (my - Constants.GRID_Y) / Constants.CELL_H;
-        if (hoverCol < 0 || hoverCol >= Constants.COLS || hoverRow < 0 || hoverRow >= Constants.ROWS) {
+        int newCol = (mx - Constants.GRID_X) / Constants.CELL_W;
+        int newRow = (my - Constants.GRID_Y) / Constants.CELL_H;
+        if (newCol < 0 || newCol >= Constants.COLS || newRow < 0 || newRow >= Constants.ROWS) {
             hoverCol = hoverRow = -1;
+            // if we had a selected tile, cancel it when mouse leaves grid
+            if (selectedTileCol >= 0) {
+                selectedTileCol = selectedTileRow = -1;
+                removeBtnBounds = null;
+            }
+            return;
+        }
+        hoverCol = newCol;
+        hoverRow = newRow;
+        // If we've previously clicked to show the overlay and now moved outside that tile, cancel it
+        if (selectedTileCol >= 0 && (hoverCol != selectedTileCol || hoverRow != selectedTileRow)) {
+            selectedTileCol = selectedTileRow = -1;
+            removeBtnBounds = null;
         }
     }
 
@@ -786,23 +882,7 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
     public void mousePressed(MouseEvent e) {
         int mx = e.getX(), my = e.getY();
 
-        if (state == State.MENU) {
-            // Start button
-            if (mx >= Constants.WINDOW_WIDTH / 2 - 100 && mx <= Constants.WINDOW_WIDTH / 2 + 100
-                    && my >= 250 && my <= 305) {
-                startGame();
-            }
-            return;
-        }
-
-        if (state == State.WIN || state == State.LOSE) {
-            int bx = Constants.WINDOW_WIDTH / 2 - 110;
-            if (mx >= bx && mx <= bx + 220) {
-                if (my >= 360 && my <= 415) startGame();
-                if (my >= 430 && my <= 485) { state = State.MENU; timer.stop(); }
-            }
-            return;
-        }
+        // menu and end-screen clicks handled in mouseClicked to ensure clicks register
 
         if (state == State.PAUSED) {
             state = State.PLAYING;
@@ -816,6 +896,17 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         // Right click: deselect
         if (e.getButton() == MouseEvent.BUTTON3) {
             selectedPlant = null;
+            return;
+        }
+
+        // If remove-button is visible and clicked -> remove plant
+        if (removeBtnBounds != null && removeBtnBounds.contains(mx, my)) {
+            if (selectedTileRow >= 0 && selectedTileCol >= 0 && grid[selectedTileRow][selectedTileCol] != null) {
+                grid[selectedTileRow][selectedTileCol] = null;
+                addFloatText("已移除植物", mx, my - 10, new Color(255, 200, 100), 16, 800);
+            }
+            selectedTileRow = selectedTileCol = -1;
+            removeBtnBounds = null;
             return;
         }
 
@@ -842,22 +933,36 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
             }
         }
 
-        // Grid placement
-        if (selectedPlant != null && hoverCol >= 0 && hoverRow >= 0) {
-            if (grid[hoverRow][hoverCol] == null && sunCount >= selectedPlant.cost) {
+        // Grid placement (hover controls remove-overlay visibility)
+        int clickedCol = (mx - Constants.GRID_X) / Constants.CELL_W;
+        int clickedRow = (my - Constants.GRID_Y) / Constants.CELL_H;
+        boolean clickedOnGrid = clickedCol >= 0 && clickedCol < Constants.COLS && clickedRow >= 0 && clickedRow < Constants.ROWS;
+
+        if (selectedPlant != null && clickedOnGrid) {
+            if (grid[clickedRow][clickedCol] == null && sunCount >= selectedPlant.cost) {
                 Plant newPlant = switch (selectedPlant) {
-                    case SUNFLOWER -> new Sunflower(hoverCol, hoverRow);
-                    case PEASHOOTER -> new Peashooter(hoverCol, hoverRow);
-                    case WALLNUT -> new Wallnut(hoverCol, hoverRow);
-                    case SNOWPEA -> new SnowPea(hoverCol, hoverRow);
-                    case CHERRYBOMB -> new CherryBomb(hoverCol, hoverRow);
+                    case SUNFLOWER -> new Sunflower(clickedCol, clickedRow);
+                    case PEASHOOTER -> new Peashooter(clickedCol, clickedRow);
+                    case WALLNUT -> new Wallnut(clickedCol, clickedRow);
+                    case SNOWPEA -> new SnowPea(clickedCol, clickedRow);
+                    case CHERRYBOMB -> new CherryBomb(clickedCol, clickedRow);
                 };
-                grid[hoverRow][hoverCol] = newPlant;
+                grid[clickedRow][clickedCol] = newPlant;
                 sunCount -= selectedPlant.cost;
                 addFloatText("-" + selectedPlant.cost + " ☀", mx, my - 20,
                         new Color(220, 180, 50), 16, 800);
                 // Keep selected for rapid planting (deselect cherry bomb after place)
                 if (selectedPlant == PlantType.CHERRYBOMB) selectedPlant = null;
+            }
+        } else if (clickedOnGrid) {
+            // Click-to-show overlay: if clicking an occupied tile, show remove/X button.
+            if (grid[clickedRow][clickedCol] != null) {
+                selectedTileCol = clickedCol;
+                selectedTileRow = clickedRow;
+            } else {
+                // clicked empty tile -> cancel any shown overlay
+                selectedTileCol = selectedTileRow = -1;
+                removeBtnBounds = null;
             }
         }
     }
