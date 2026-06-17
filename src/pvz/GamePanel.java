@@ -58,6 +58,9 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
     // ── Fonts ──────────────────────────────────────────────────────────────────
     private Font bigFont, medFont, smallFont;
 
+    // ── Window (merged from GameWindow) ────────────────────────────────────────
+    private JFrame frame;
+
     public GamePanel() {
         setPreferredSize(new Dimension(Constants.WINDOW_WIDTH, Constants.WINDOW_HEIGHT));
         setBackground(new Color(80, 140, 60));
@@ -65,8 +68,31 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         setFocusable(true);
         addMouseListener(this);
         addMouseMotionListener(this);
+
+        // Keyboard input
+        addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                handleKey(e);
+            }
+        });
+
         timer = new javax.swing.Timer(16, this); // ~60fps
         initFonts();
+        initWindow();
+    }
+
+    private void initWindow() {
+        frame = new JFrame("🌻 植物大戰殭屍 - Java Edition");
+        frame.add(this);
+        frame.pack();
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setLocationRelativeTo(null);
+        frame.setResizable(false);
+    }
+
+    public JFrame getFrame() {
+        return frame;
     }
 
     private void initFonts() {
@@ -671,16 +697,16 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         }
 
         // Right side: wave info
-        g.setColor(new Color(255, 220, 150));
+        g.setColor(new Color(0, 100, 0));
         g.setFont(new Font("Dialog", Font.BOLD, 14));
         String waveStr = "第 " + Math.min(wave, maxWaves) + "/" + maxWaves + " 波";
         g.drawString(waveStr, 780, 40);
-        g.setColor(new Color(180, 220, 150));
+        g.setColor(new Color(0, 100, 0));
         g.setFont(new Font("Dialog", Font.PLAIN, 13));
         g.drawString("消滅: " + zombiesKilled, 780, 60);
 
         // ESC hint
-        g.setColor(new Color(180, 200, 170));
+        g.setColor(new Color(0, 100, 0));
         g.setFont(new Font("Dialog", Font.PLAIN, 12));
         g.drawString("[ESC] 暫停", 780, 95);
     }
