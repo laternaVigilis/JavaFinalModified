@@ -9,6 +9,7 @@ javac -encoding UTF-8 -d out -sourcepath src ^
     "src\pvz\Pea.java" ^
     "src\pvz\PlantType.java" ^
     "src\pvz\Sun.java" ^
+    "src\pvz\FloatText.java" ^
     "src\pvz\Plant\CherryBomb.java" ^
     "src\pvz\Plant\Peashooter.java" ^
     "src\pvz\Plant\Plant.java" ^
