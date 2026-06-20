@@ -8,7 +8,7 @@ import java.util.List;
 import pvz.Plant.*;
 import pvz.Zombie.*;
 
-public class GamePanel extends JPanel implements MouseListener, MouseMotionListener {
+public class GamePanel extends JPanel {
 
     // ── Game state ─────────────────────────────────────────────────────────────
     public enum State { MENU, PLAYING, PAUSED, WIN, LOSE }
@@ -53,8 +53,10 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
         setBackground(new Color(80, 140, 60));
         // allow keyboard focus so ESC and other keys work
         setFocusable(true);
-        addMouseListener(this);
-        addMouseMotionListener(this);
+        // attach extracted input listener
+        GameInputListener inputListener = new GameInputListener(this, world);
+        addMouseListener(inputListener);
+        addMouseMotionListener(inputListener);
 
         // Keyboard input
         addKeyListener(new KeyAdapter() {
@@ -89,6 +91,20 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
     public GameWorld getWorld() { return world; }
     public synchronized long getLastUpdate() { return lastUpdate; }
     public synchronized void setLastUpdate(long v) { lastUpdate = v; }
+    // Expose small accessors used by input listener
+    public PlantType getSelectedPlant() { return selectedPlant; }
+    public void setSelectedPlant(PlantType p) { selectedPlant = p; }
+    public int getHoverCol() { return hoverCol; }
+    public int getHoverRow() { return hoverRow; }
+    public void setHoverColRow(int c, int r) { hoverCol = c; hoverRow = r; }
+    public int getSelectedTileCol() { return selectedTileCol; }
+    public int getSelectedTileRow() { return selectedTileRow; }
+    public void setSelectedTile(int c, int r) { selectedTileCol = c; selectedTileRow = r; }
+    public Rectangle getRemoveBtnBounds() { return removeBtnBounds; }
+    public void setRemoveBtnBounds(Rectangle r) { removeBtnBounds = r; }
+    public Point getMousePos() { return mousePos; }
+    public void setMousePos(Point p) { mousePos = p; }
+    public void stopEngine() { if (engine != null) engine.stop(); }
     // prepare end-screen button rectangles (used by engine when game ends)
     public void prepareEndScreenButtons() {
         int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
@@ -582,173 +598,7 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
         g.drawString(text, x + (w - fm.stringWidth(text)) / 2, y + h / 2 + fm.getAscent() / 2 - 2);
     }
 
-    // ── Mouse events ───────────────────────────────────────────────────────────
-    @Override
-    public void mouseClicked(MouseEvent e) {
-        int mx = e.getX(), my = e.getY();
-        // Menu start
-        if (state == State.MENU) {
-            if (mx >= Constants.WINDOW_WIDTH / 2 - 100 && mx <= Constants.WINDOW_WIDTH / 2 + 100
-                    && my >= 250 && my <= 305) {
-                startGame();
-            }
-            return;
-        }
-
-        // Pause menu clicks
-        if (state == State.PAUSED) {
-            if (pauseBtnContinueBounds != null && pauseBtnContinueBounds.contains(mx, my)) {
-                state = State.PLAYING;
-                totalPauseTime += System.currentTimeMillis() - pauseStart;
-                lastUpdate = System.currentTimeMillis();
-                pauseBtnContinueBounds = null; pauseBtnRestartBounds = null; pauseBtnEndBounds = null;
-                repaint();
-            } else if (pauseBtnRestartBounds != null && pauseBtnRestartBounds.contains(mx, my)) {
-                startGame();
-                repaint();
-            } else if (pauseBtnEndBounds != null && pauseBtnEndBounds.contains(mx, my)) {
-                state = State.LOSE;
-                engine.stop();
-                prepareEndScreenButtons();
-                pauseBtnContinueBounds = null; pauseBtnRestartBounds = null; pauseBtnEndBounds = null;
-                repaint();
-            }
-            return;
-        }
-
-        // End screen buttons (use drawn bounds for accuracy)
-        if (state == State.WIN || state == State.LOSE) {
-            if (endBtnRestartBounds != null && endBtnRestartBounds.contains(mx, my)) {
-                startGame();
-                repaint();
-            } else if (endBtnMenuBounds != null && endBtnMenuBounds.contains(mx, my)) {
-                state = State.MENU;
-                engine.stop();
-                // clear button bounds when returning to menu
-                endBtnRestartBounds = null;
-                endBtnMenuBounds = null;
-                repaint();
-            }
-            return;
-        }
-    }
-    @Override public void mouseEntered(MouseEvent e) {}
-    @Override public void mouseExited(MouseEvent e) {}
-    @Override public void mouseDragged(MouseEvent e) {}
-
-    @Override
-    public void mouseMoved(MouseEvent e) {
-        mousePos = e.getPoint();
-        int mx = e.getX(), my = e.getY();
-        int newCol = (mx - Constants.GRID_X) / Constants.CELL_W;
-        int newRow = (my - Constants.GRID_Y) / Constants.CELL_H;
-        if (newCol < 0 || newCol >= Constants.COLS || newRow < 0 || newRow >= Constants.ROWS) {
-            hoverCol = hoverRow = -1;
-            // if we had a selected tile, cancel it when mouse leaves grid
-            if (selectedTileCol >= 0) {
-                selectedTileCol = selectedTileRow = -1;
-                removeBtnBounds = null;
-            }
-            return;
-        }
-        hoverCol = newCol;
-        hoverRow = newRow;
-        // If we've previously clicked to show the overlay and now moved outside that tile, cancel it
-        if (selectedTileCol >= 0 && (hoverCol != selectedTileCol || hoverRow != selectedTileRow)) {
-            selectedTileCol = selectedTileRow = -1;
-            removeBtnBounds = null;
-        }
-    }
-
-    @Override
-    public void mousePressed(MouseEvent e) {
-        int mx = e.getX(), my = e.getY();
-
-        // menu and end-screen clicks handled in mouseClicked to ensure clicks register
-
-        if (state == State.PAUSED) {
-            // Do not auto-resume on arbitrary clicks; pause menu handles clicks explicitly
-            return;
-        }
-
-        if (state != State.PLAYING) return;
-
-        // Right click: deselect
-        if (e.getButton() == MouseEvent.BUTTON3) {
-            selectedPlant = null;
-            return;
-        }
-
-        // If remove-button is visible and clicked -> remove plant
-        if (removeBtnBounds != null && removeBtnBounds.contains(mx, my)) {
-                if (selectedTileRow >= 0 && selectedTileCol >= 0 && world.grid[selectedTileRow][selectedTileCol] != null) {
-                world.grid[selectedTileRow][selectedTileCol] = null;
-                world.addFloatText("已移除植物", mx, my - 10, new Color(255, 200, 100), 16, 800);
-            }
-            selectedTileRow = selectedTileCol = -1;
-            removeBtnBounds = null;
-            return;
-        }
-
-        // Check sun collection
-        for (Sun s : world.suns) {
-            if (s.getBounds().contains(mx, my)) {
-                s.collected = true;
-                world.sunCount += Constants.SUN_VALUE;
-                world.addFloatText("+25 ☀", mx, my, new Color(255, 230, 50), 18, 900);
-                return;
-            }
-        }
-
-        // Check shop clicks
-        PlantType[] types = PlantType.values();
-        for (int i = 0; i < types.length; i++) {
-            int ix = Constants.SHOP_START_X + i * (Constants.SHOP_ITEM_W + 8);
-            int iy = Constants.SHOP_Y + 5;
-            if (mx >= ix && mx <= ix + Constants.SHOP_ITEM_W && my >= iy && my <= iy + Constants.SHOP_ITEM_H) {
-                if (world.sunCount >= types[i].cost) {
-                    selectedPlant = types[i];
-                }
-                return;
-            }
-        }
-
-        // Grid placement (hover controls remove-overlay visibility)
-        int clickedCol = (mx - Constants.GRID_X) / Constants.CELL_W;
-        int clickedRow = (my - Constants.GRID_Y) / Constants.CELL_H;
-        boolean clickedOnGrid = clickedCol >= 0 && clickedCol < Constants.COLS && clickedRow >= 0 && clickedRow < Constants.ROWS;
-
-        if (selectedPlant != null && clickedOnGrid) {
-            if (world.grid[clickedRow][clickedCol] == null && world.sunCount >= selectedPlant.cost) {
-                Plant newPlant = switch (selectedPlant) {
-                    case SUNFLOWER -> new Sunflower(clickedCol, clickedRow);
-                    case PEASHOOTER -> new Peashooter(clickedCol, clickedRow);
-                    case WALLNUT -> new Wallnut(clickedCol, clickedRow);
-                    case SNOWPEA -> new SnowPea(clickedCol, clickedRow);
-                    case CHERRYBOMB -> new CherryBomb(clickedCol, clickedRow);
-                };
-                world.grid[clickedRow][clickedCol] = newPlant;
-                world.sunCount -= selectedPlant.cost;
-                world.addFloatText("-" + selectedPlant.cost + " ☀", mx, my - 20,
-                        new Color(220, 180, 50), 16, 800);
-                // Keep selected for rapid planting (deselect cherry bomb after place)
-                if (selectedPlant == PlantType.CHERRYBOMB) selectedPlant = null;
-            }
-        } else if (clickedOnGrid) {
-            // Click-to-show overlay: if clicking an occupied tile, show remove/X button.
-            if (world.grid[clickedRow][clickedCol] != null) {
-                selectedTileCol = clickedCol;
-                selectedTileRow = clickedRow;
-            } else {
-                // clicked empty tile -> cancel any shown overlay
-                selectedTileCol = selectedTileRow = -1;
-                removeBtnBounds = null;
-            }
-        }
-    }
-
-    @Override
-    public void mouseReleased(MouseEvent e) {}
+    // Mouse input handling has been moved to pvz.GameInputListener
 
     // ── Keyboard ───────────────────────────────────────────────────────────────
     public void handleKey(KeyEvent e) {
@@ -773,6 +623,33 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
                 repaint();
             }
         }
+    }
+
+    // Helper methods for the input listener to control pause/resume flows
+    public void enterPauseMenu() {
+        state = State.PAUSED;
+        pauseStart = System.currentTimeMillis();
+        int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
+        pauseBtnContinueBounds = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y, Constants.END_BTN_W, Constants.END_BTN_H);
+        pauseBtnRestartBounds  = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y + Constants.PAUSE_BTN_GAP, Constants.END_BTN_W, Constants.END_BTN_H);
+        pauseBtnEndBounds      = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y + Constants.PAUSE_BTN_GAP * 2, Constants.END_BTN_W, Constants.END_BTN_H);
+        repaint();
+    }
+
+    public void resumeFromPause() {
+        state = State.PLAYING;
+        totalPauseTime += System.currentTimeMillis() - pauseStart;
+        lastUpdate = System.currentTimeMillis();
+        pauseBtnContinueBounds = null; pauseBtnRestartBounds = null; pauseBtnEndBounds = null;
+        repaint();
+    }
+
+    public void endGameFromPauseAsLose() {
+        state = State.LOSE;
+        if (engine != null) engine.stop();
+        prepareEndScreenButtons();
+        pauseBtnContinueBounds = null; pauseBtnRestartBounds = null; pauseBtnEndBounds = null;
+        repaint();
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
