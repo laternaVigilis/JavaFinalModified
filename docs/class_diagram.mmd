@@ -1,0 +1,151 @@
+---
+title: PVZ Java Project - Class Diagram
+---
+classDiagram
+    %% Core UI / engine
+    class Main {
+        +main(String[] args)
+    }
+    class GamePanel {
+        +State state
+        +GameWorld world
+        +GameEngine engine
+        +startGame()
+        +paintComponent(g)
+    }
+    class GameEngine {
+        -timer
+        +start()
+        +stop()
+    }
+
+    %% Game model
+    class GameWorld {
+        +Plant[][] grid
+        +List~Zombie~ zombies
+        +List~Pea~ peas
+        +List~Sun~ suns
+        +List~Explosion~ explosions
+        +List~FloatText~ floatTexts
+        +int sunCount
+        +int wave
+        +start()
+        +update(dt)
+    }
+
+    %% Plants
+    class Plant {
+        <<abstract>>
+        +PlantType type
+        +int col
+        +int row
+        +int hp
+        +draw(Graphics2D g)
+    }
+    class Peashooter { +draw(Graphics2D g) }
+    class Sunflower { +draw(Graphics2D g) }
+    class Wallnut { +draw(Graphics2D g) }
+    class SnowPea { +draw(Graphics2D g) }
+    class CherryBomb { +draw(Graphics2D g) }
+
+    Plant <|-- Peashooter
+    Plant <|-- Sunflower
+    Plant <|-- Wallnut
+    Plant <|-- SnowPea
+    Plant <|-- CherryBomb
+
+    class PlantType {
+        <<enumeration>>
+        SUNFLOWER
+        PEASHOOTER
+        WALLNUT
+        SNOWPEA
+        CHERRYBOMB
+    }
+    Plant --> PlantType : has type
+
+    %% Zombies
+    class Zombie {
+        <<abstract>>
+        +int row
+        +double x
+        +int hp
+        +int level
+        +update(dt)
+        +draw(Graphics2D g)
+    }
+    class NormalZombie
+    class FastZombie
+    class TankZombie
+    class CherryZombie
+
+    Zombie <|-- NormalZombie
+    Zombie <|-- FastZombie
+    Zombie <|-- TankZombie
+    Zombie <|-- CherryZombie
+
+    class ZombieType {
+        <<enumeration>>
+        NORMAL
+        FAST
+        TANK
+        CHERRY
+    }
+    ZombieType ..> Zombie : factory create()
+
+    %% Project entities
+    class Pea {
+        +double x
+        +double y
+        +int row
+        +boolean frozen
+        +update(dt)
+        +draw(Graphics2D g)
+    }
+    class Sun {
+        +double x
+        +double y
+        +boolean falling
+        +update(dt)
+        +draw(Graphics2D g)
+    }
+    class Explosion {
+        +double x
+        +double y
+        +int radius
+        +update(dt)
+        +draw(Graphics2D g)
+    }
+    class FloatText {
+        +String text
+        +double x
+        +double y
+        +draw(Graphics2D g)
+    }
+
+    %% Relationships / multiplicity
+    GamePanel *-- GameWorld : owns
+    GameWorld "1" --> "*" Zombie : contains
+    GameWorld "1" --> "*" Pea : contains
+    GameWorld "1" --> "*" Sun : contains
+    GameWorld "1" --> "*" Explosion : contains
+    GameWorld "1" --> "*" FloatText : contains
+
+    GameEngine --> GamePanel : controls
+    GameEngine --> GameWorld : updates
+    Main --> GamePanel : starts
+
+    class GameInputListener {
+        +mouseClicked(e)
+        +mouseMoved(e)
+    }
+    GameInputListener --> GamePanel
+    GameInputListener --> GameWorld
+
+    class Constants {
+        <<static>>
+    }
+    Constants ..> GamePanel
+    Constants ..> GameWorld
+    Constants ..> Plant
+    Constants ..> Zombie
